@@ -2,7 +2,7 @@
 var Box = (function() {
 
     //  Set our constants first for the game canvas size and the backgound image.
-    const CANVAS_WIDTH = 400;
+    const CANVAS_WIDTH = 500;
     const CANVAS_HEIGHT = 300;
 
     var BACKGROUND_IMAGE = new Image();
@@ -12,6 +12,10 @@ var Box = (function() {
     var CANVAS;
     var CTX;    
     var PLAYER;      
+    var ENEMIES_WAITING = [];
+    var ENEMIES = [];
+    var FRAME = 0;
+    var RELEASE_RATE = 100;
          
     //  Entry function that needs to be made to setup the game canvas and starts the game.
     function Setup () {
@@ -20,20 +24,30 @@ var Box = (function() {
         CANVAS.width  = CANVAS_WIDTH;    
         CANVAS.height = CANVAS_HEIGHT;
         PLAYER = new Player();
+        ENEMIES_WAITING = RandomEnemyArray(10,CANVAS_WIDTH);
         Play();            
     }
 
-    //  The main loop that the game will run on is here, we clear the canvas, 
-    //  draw the ball, check for collisions, game over and then call it all again.
+    //  The main loop that the game will run on is here, we check for collisions, game over 
+    //  and then call it all again.
     function Play () {
+
+        FRAME++;
 
         //  Set the background
         CTX.drawImage(BACKGROUND_IMAGE, 0, 0);
 
-        //  Draw the player on the canvas
+        //  Draw the player on the canvas, release add the enemies
         DrawPlayer();
+        ReleaseEnemies();
+        MoveEnemies();
 
-        console.log('Playing, lets get started then.....');
+        //  Detect if the box has touched an enemy now
+        var collision = ENEMIES.findIndex(DetectCollision);
+        console.log(collision)
+        if (collision > -1) {
+            ENEMIES.splice(collision,1);
+        }
 
         //  Check if the player has any lives left and if so, let's call the next animation frame
         if (PLAYER.lives > 0) {
@@ -46,13 +60,38 @@ var Box = (function() {
         }
     }
 
-    //  Shortcut to clear the canvas
-    function ClearCanvas () {
-        CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+    //  Releases an enemy
+    function ReleaseEnemies () {
+        if (FRAME%RELEASE_RATE == 0 && ENEMIES_WAITING.length) {            
+            var releasedEnemy = ENEMIES_WAITING.shift();
+            ENEMIES.push(releasedEnemy);
+        }
+    }
+
+    //  While there are still enemies, we want to move these down the screen every
+    function MoveEnemies () {
+        if (ENEMIES.length || ENEMIES_WAITING.length) {
+            ENEMIES.map(function (enemy) {                
+                if (enemy.y < CANVAS_HEIGHT-enemy.height) {
+                    DrawEnemy(enemy);                          
+                    enemy.y++;
+                }            
+                else {
+                    ENEMIES.shift();
+                }
+            });
+        }
+        else {
+            console.log('No enemies left!');
+        }
     }
 
     function DrawPlayer () {
         CTX.fillRect(PLAYER.x,PLAYER.y,PLAYER.width,PLAYER.height);
+    }
+
+    function DrawEnemy (enemy) {
+        CTX.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
     }
 
     //  Let's setup the player's controls, and return a player object for use in the game
@@ -89,14 +128,33 @@ var Box = (function() {
         this.score = 0;
         this.height = 30;
         this.width = 30;
-        this.speed = 5;
-        this.x = 0;
-        this.y = 0;
+        this.speed = 18;
+        this.x = CANVAS_WIDTH/2 - this.width/2;
+        this.y = CANVAS_HEIGHT-this.height;
     }
 
+    //  Create an array of random enemies, this will become the enemy starting points
+    function RandomEnemyArray(length, max) {
+        return Array.apply(null, Array(length)).map(function(_, i) {
+            return new Enemy(Math.round(Math.random() * max));
+        });
+    }
    
-    function DetectCollision () {        
-        return false;
+    //  Creates the enemy object that is used in the enemies array, this has a starting X and Y 
+    //  position, but the y is always at the top of the screen.
+    function Enemy (x) {
+        this.x = x;
+        this.y = 0;
+        this.width = 5;
+        this.height = 5;
+    }
+
+    //  Returns if there has been a collision
+    function DetectCollision (enemy) {
+        return (enemy.x < PLAYER.x + PLAYER.width &&
+            enemy.x + enemy.width > PLAYER.x &&
+            enemy.y < PLAYER.y + PLAYER.height &&
+            enemy.height + enemy.y > PLAYER.y)
     }
 
     return {
